@@ -4,13 +4,15 @@ import subprocess
 import webbrowser
 import re
 import json
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,QLineEdit, QListWidget, QListWidgetItem, QPushButton,QGraphicsDropShadowEffect, QGraphicsOpacityEffect)
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem,QPushButton, QGraphicsDropShadowEffect)
 from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QRect, QEasingCurve
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QColor
 
-ICON_PASTE_PATH = "path_to_your_image"
-ICON_SCREENSHOT_PATH = "path_to_your_image"
-ICON_TERMINAL_PATH = "path_to_your_image"
+os.environ["QT_LOGGING_RULES"] = "qt.svg.warning=false"
+
+ICON_PASTE_PATH = "your_path"
+ICON_SCREENSHOT_PATH = "your_path"
+ICON_TERMINAL_PATH = "your_path"
 
 
 class SpotlightClone(QWidget):
@@ -284,8 +286,15 @@ class SpotlightClone(QWidget):
 
         query = text.lower()
         matched_apps = [app for app in self.apps if query in app['name'].lower()]
-        matched_names = set()
 
+        matched_apps.sort(key=lambda app: (
+            not app['name'].lower().startswith(query),
+            not any(word.startswith(query) for word in app['name'].lower().split()),
+            len(app['name']),
+            app['name'].lower()
+        ))
+
+        matched_names = set()
         for app in matched_apps:
             if app['name'] not in matched_names and len(matched_names) < 6:
                 matched_names.add(app['name'])
@@ -299,7 +308,24 @@ class SpotlightClone(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, {"type": "app", "name": app['name'], "exec": app['exec']})
                 self.result_list.addItem(item)
 
-        web_item = QListWidgetItem(f"     Search: {text}")
+        if len(text.strip()) >= 2:
+            try:
+                safe_text = text.replace("'", "'\\''")
+                cmd = f"find ~ -maxdepth 4 \\( -path '*/.*' -prune \\) -o -type f -iname '*{safe_text}*' -print 2>/dev/null | head -n 5"
+                output = subprocess.check_output(cmd, shell=True, text=True)
+                for path in output.splitlines():
+                    path = path.strip()
+                    if path:
+                        name = os.path.basename(path)
+                        short_path = path.replace(os.path.expanduser("~"), "~")
+                        item = QListWidgetItem(f" 📄  {name}  ({os.path.dirname(short_path)})")
+                        item.setIcon(QIcon.fromTheme("text-x-generic"))
+                        item.setData(Qt.ItemDataRole.UserRole, {"type": "file", "path": path})
+                        self.result_list.addItem(item)
+            except Exception:
+                pass
+
+        web_item = QListWidgetItem(f"      Search: {text}")
         web_item.setIcon(QIcon.fromTheme("edit-find"))
         web_item.setData(Qt.ItemDataRole.UserRole, {"type": "web", "query": text})
         self.result_list.addItem(web_item)
@@ -317,6 +343,8 @@ class SpotlightClone(QWidget):
 
         if data["type"] == "app":
             subprocess.Popen(data["exec"], shell=True, start_new_session=True)
+        elif data["type"] == "file":
+            subprocess.Popen(["xdg-open", data["path"]])
         elif data["type"] == "web":
             webbrowser.open(f"https://google.com/search?q={data['query']}")
         elif data["type"] == "math":
@@ -329,7 +357,7 @@ class SpotlightClone(QWidget):
         QApplication.quit()
 
     def open_terminal(self):
-        subprocess.Popen("konsole", shell=True) #change it to your preferred terminal 
+        subprocess.Popen("konsole", shell=True) #change to your preffered terminal
         QApplication.quit()
 
     def select_next(self):
