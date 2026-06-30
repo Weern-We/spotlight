@@ -9,4 +9,5 @@ To add a keyboard shortcut to launch it in **GNOME,** go to **Settings** > **Key
 
 ## In **Hyprland** just add spotlight.py in the keybinds
 To switch the **terminal** to yours you need to change the line at the end of the code to your terminal.
-Also, if you want to include icons for **screenshots** and the like add the paths to your icons in the code.
+
+## Also, if you want to include icons for **screenshots** and the like add the paths to your icons in the code.
