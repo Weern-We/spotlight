@@ -7,4 +7,4 @@ To add a keyboard shortcut to launch it in **GNOME,** go to **Settings** > **Key
 /usr/bin/python /path_to_your_spotlight.py
 ```
 
-In **Hyprland** just add spotlight.py in the autostart
+In **Hyprland** just add spotlight.py in the keybinds
