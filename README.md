@@ -1,4 +1,5 @@
 # Spotlight
+![preview](https://github.com/Weern-We/Spotlight/blob/main/imgicons/SpotlightPreview.png)
 ### Like **spotlight** from **apple** for linux-based distros on **python**.
 
 To add a keyboard shortcut to launch it in **GNOME,** go to **Settings** > **Keyboard** > **View and Customize Shortcuts** > **Custom Shortcuts**.Then add a name and your preferred key combination.Next paste these commands replacing `path_to_your_spotlight.py` with the actual path to your file.
