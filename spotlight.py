@@ -329,7 +329,7 @@ class SpotlightClone(QWidget):
         QApplication.quit()
 
     def open_terminal(self):
-        subprocess.Popen("konsole", shell=True)
+        subprocess.Popen("konsole", shell=True) #change it to your preferred terminal 
         QApplication.quit()
 
     def select_next(self):
