@@ -1,44 +1,69 @@
-#!/usr/bin/env python3
 import sys
 import os
 import subprocess
 import webbrowser
 import re
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,QLineEdit, QListWidget, QListWidgetItem, QPushButton,QGraphicsDropShadowEffect)
-from PyQt6.QtCore import Qt, QSize
+import json
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,QLineEdit, QListWidget, QListWidgetItem, QPushButton,QGraphicsDropShadowEffect, QGraphicsOpacityEffect)
+from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QRect, QEasingCurve
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QColor
+
+ICON_PASTE_PATH = "path_to_your_image"
+ICON_SCREENSHOT_PATH = "path_to_your_image"
+ICON_TERMINAL_PATH = "path_to_your_image"
 
 
 class SpotlightClone(QWidget):
     def __init__(self):
         super().__init__()
+        self.pinned_file = os.path.expanduser("~/.spotlight_pinned.json")
+        self.pinned_apps = self.load_pinned()
         self.apps = self.load_apps()
+        self.current_target_height = 80
         self.initUI()
         self.update_results("")
+
+    def load_pinned(self):
+        if os.path.exists(self.pinned_file):
+            try:
+                with open(self.pinned_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
+
+    def save_pinned(self):
+        try:
+            with open(self.pinned_file, 'w', encoding='utf-8') as f:
+                json.dump(self.pinned_apps, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Error: {e}")
 
     def initUI(self):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.resize(800, 500)
+        self.resize(800, self.current_target_height)
         self.center_on_screen()
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        main_layout.setSpacing(0)
+
         top_panel = QWidget()
         top_layout = QHBoxLayout(top_panel)
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(12)
 
         element_style = """
-            background-color: rgba(225, 230, 250, 0.85); 
+            background-color: rgba(225, 230, 253, 0.85); 
             color: #1a1a1a;
             border-radius: 25px;
         """
 
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Search")
+        self.input_field.setPlaceholderText("Spotlight Search")
         self.input_field.setFont(QFont("Cantarell", 18))
         self.input_field.setFixedHeight(50)
         self.input_field.setStyleSheet(f"""
@@ -48,8 +73,8 @@ class SpotlightClone(QWidget):
                 border: 1px solid rgba(255, 255, 255, 0.4);
             }}
             QLineEdit:focus {{
-                background-color: rgba(235, 240, 255, 0.95);
-                border: 1px solid rgba(255, 255, 255, 0.8);
+                background-color: rgba(240, 244, 255, 0.95);
+                border: 1px solid rgba(0, 122, 255, 0.4);
             }}
         """)
         self.input_field.textChanged.connect(self.update_results)
@@ -58,26 +83,38 @@ class SpotlightClone(QWidget):
         btn_qss = f"""
             QPushButton {{
                 {element_style}
-                font-size: 20px;
                 border: 1px solid rgba(255, 255, 255, 0.4);
+                border-radius: 25px;
             }}
             QPushButton:hover {{ 
                 background-color: rgba(255, 255, 255, 0.95); 
-                border: 1px solid rgba(255, 255, 255, 0.8);
+                border: 1px solid rgba(0, 122, 255, 0.3);
             }}
         """
 
-        self.btn_screenshot = QPushButton("📸")
+        self.btn_paste = QPushButton()
+        self.btn_paste.setFixedSize(50, 50)
+        self.btn_paste.setStyleSheet(btn_qss)
+        self.btn_paste.setIcon(QIcon(ICON_PASTE_PATH))
+        self.btn_paste.setIconSize(QSize(22, 22))
+        self.btn_paste.clicked.connect(self.paste_from_clipboard)
+
+        self.btn_screenshot = QPushButton()
         self.btn_screenshot.setFixedSize(50, 50)
         self.btn_screenshot.setStyleSheet(btn_qss)
+        self.btn_screenshot.setIcon(QIcon(ICON_SCREENSHOT_PATH))
+        self.btn_screenshot.setIconSize(QSize(22, 22))
         self.btn_screenshot.clicked.connect(self.take_screenshot)
 
-        self.btn_terminal = QPushButton("💻")
+        self.btn_terminal = QPushButton()
         self.btn_terminal.setFixedSize(50, 50)
         self.btn_terminal.setStyleSheet(btn_qss)
+        self.btn_terminal.setIcon(QIcon(ICON_TERMINAL_PATH))
+        self.btn_terminal.setIconSize(QSize(22, 22))
         self.btn_terminal.clicked.connect(self.open_terminal)
 
         top_layout.addWidget(self.input_field)
+        top_layout.addWidget(self.btn_paste)
         top_layout.addWidget(self.btn_screenshot)
         top_layout.addWidget(self.btn_terminal)
 
@@ -86,45 +123,34 @@ class SpotlightClone(QWidget):
         self.result_list.setIconSize(QSize(32, 32))
 
         self.result_list.setStyleSheet("""
-                    QListWidget {
-                        background-color: rgba(255, 255, 255, 0.85); 
-                        border-radius: 20px;
-                        padding: 10px;
-                        color: #000000;
-                        border: 1px solid rgba(255, 255, 255, 0.3);
-                        outline: none;
-                    }
-                    QListWidget::item {
-                        padding: 12px;
-                        border-radius: 10px;
-                        color: #333;
-                    }
-                    QListWidget::item:selected {
-                        background-color: rgba(0, 122, 255, 0.15); 
-                        color: #007aff;
-                        font-weight: bold;
-                    }
-                """)
-
-        self.input_field.setStyleSheet(f"""
-                    QLineEdit {{
-                        background-color: rgba(255, 255, 255, 0.95);
-                        color: #000;
-                        border-radius: 25px;
-                        padding-left: 20px;
-                        border: 1px solid rgba(0,0,0,0.1);
-                    }}
-                """)
+            QListWidget {
+                background-color: rgba(245, 246, 248, 0.9); 
+                border-radius: 18px;
+                padding: 8px;
+                color: #1a1a1a;
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                margin-top: 12px;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 10px 15px;
+                border-radius: 10px;
+                margin-bottom: 2px;
+                color: #222222;
+            }
+            QListWidget::item:selected {
+                background-color: #007aff; 
+                color: #ffffff;
+            }
+        """)
         self.result_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.result_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(30)
-        shadow.setColor(QColor(0, 0, 0, 150))
-        shadow.setOffset(0, 10)
-        self.result_list.setGraphicsEffect(shadow)
-
-        self.result_list.hide()
+        shadow.setBlurRadius(35)
+        shadow.setColor(QColor(0, 0, 0, 70))
+        shadow.setOffset(0, 8)
+        self.setGraphicsEffect(shadow)
 
         main_layout.addWidget(top_panel)
         main_layout.addWidget(self.result_list)
@@ -132,12 +158,30 @@ class SpotlightClone(QWidget):
         QShortcut(QKeySequence("Down"), self.input_field, self.select_next)
         QShortcut(QKeySequence("Up"), self.input_field, self.select_prev)
         QShortcut(QKeySequence("Escape"), self, QApplication.quit)
+        QShortcut(QKeySequence("Ctrl+P"), self.input_field, self.toggle_pin)
+
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(180)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
     def center_on_screen(self):
         screen = QApplication.primaryScreen().geometry()
         x = (screen.width() - self.width()) // 2
         y = int(screen.height() * 0.15)
         self.move(x, y)
+
+    def animate_window_height(self, target_height):
+        if self.current_target_height == target_height:
+            return
+        self.current_target_height = target_height
+
+        start_geo = self.geometry()
+        end_geo = QRect(start_geo.x(), start_geo.y(), start_geo.width(), target_height)
+
+        self.animation.stop()
+        self.animation.setStartValue(start_geo)
+        self.animation.setEndValue(end_geo)
+        self.animation.start()
 
     def load_apps(self):
         apps = []
@@ -173,11 +217,52 @@ class SpotlightClone(QWidget):
                         pass
         return apps
 
+    def paste_from_clipboard(self):
+        clipboard = QApplication.clipboard()
+        self.input_field.setText(clipboard.text())
+
+    def toggle_pin(self):
+        item = self.result_list.currentItem()
+        if not item: return
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if not data or data.get("type") != "app": return
+
+        app_name = data["name"]
+        if app_name in self.pinned_apps:
+            self.pinned_apps.remove(app_name)
+        else:
+            self.pinned_apps.append(app_name)
+
+        self.save_pinned()
+        self.update_results(self.input_field.text())
+
     def update_results(self, text):
         self.result_list.clear()
 
         if not text.strip():
-            self.result_list.hide()
+            if self.pinned_apps:
+                for pinned_name in self.pinned_apps:
+                    app_data = next((a for a in self.apps if a['name'] == pinned_name), None)
+                    item = QListWidgetItem(f" ★  {pinned_name}")
+                    if app_data and app_data.get('icon'):
+                        icon = QIcon.fromTheme(app_data['icon'])
+                        if not icon.isNull(): item.setIcon(icon)
+
+                    item.setData(Qt.ItemDataRole.UserRole, {
+                        "type": "app",
+                        "name": pinned_name,
+                        "exec": app_data['exec'] if app_data else pinned_name
+                    })
+                    self.result_list.addItem(item)
+
+                self.result_list.show()
+                self.result_list.setCurrentRow(0)
+                items_count = self.result_list.count()
+                target_h = 80 + (items_count * 56) + 20
+                self.animate_window_height(min(target_h, 500))
+            else:
+                self.result_list.hide()
+                self.animate_window_height(80)
             return
 
         self.result_list.show()
@@ -204,19 +289,26 @@ class SpotlightClone(QWidget):
         for app in matched_apps:
             if app['name'] not in matched_names and len(matched_names) < 6:
                 matched_names.add(app['name'])
-                item = QListWidgetItem(f"   {app['name']}")
+                is_pinned = app['name'] in self.pinned_apps
+                prefix = " ★  " if is_pinned else "     "
+                item = QListWidgetItem(f"{prefix}{app['name']}")
+
                 if app.get('icon'):
                     icon = QIcon.fromTheme(app['icon'])
                     if not icon.isNull(): item.setIcon(icon)
-                item.setData(Qt.ItemDataRole.UserRole, {"type": "app", "exec": app['exec']})
+                item.setData(Qt.ItemDataRole.UserRole, {"type": "app", "name": app['name'], "exec": app['exec']})
                 self.result_list.addItem(item)
 
-        web_item = QListWidgetItem(f"   Search: {text}")
+        web_item = QListWidgetItem(f"     Search: {text}")
         web_item.setIcon(QIcon.fromTheme("edit-find"))
         web_item.setData(Qt.ItemDataRole.UserRole, {"type": "web", "query": text})
         self.result_list.addItem(web_item)
 
         self.result_list.setCurrentRow(0)
+
+        items_count = self.result_list.count()
+        target_h = 80 + (items_count * 56) + 20
+        self.animate_window_height(min(target_h, 540))
 
     def execute_action(self):
         item = self.result_list.currentItem()
@@ -237,7 +329,7 @@ class SpotlightClone(QWidget):
         QApplication.quit()
 
     def open_terminal(self):
-        subprocess.Popen("konsole", shell=True) #change it to your preferred terminal
+        subprocess.Popen("konsole", shell=True)
         QApplication.quit()
 
     def select_next(self):
