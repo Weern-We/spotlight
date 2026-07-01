@@ -10,9 +10,15 @@ from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QColor
 
 os.environ["QT_LOGGING_RULES"] = "qt.svg.warning=false"
 
+
 ICON_PASTE_PATH = "your_path_to_spotlight.py"
 ICON_SCREENSHOT_PATH = "your_path_to_spotlight.py"
 ICON_TERMINAL_PATH = "your_path_to_spotliht.py"
+
+ICON_PASTE_PATH = "your_path"
+ICON_SCREENSHOT_PATH = "your_path"
+ICON_TERMINAL_PATH = "your_path"
+
 
 
 class SpotlightClone(QWidget):
@@ -377,3 +383,4 @@ if __name__ == '__main__':
     ex = SpotlightClone()
     ex.show()
     sys.exit(app.exec())
+
